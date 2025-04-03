@@ -1,8 +1,6 @@
 # Zipper
 Zipper is a little robot buddy that tracks the face of a user using facial  recognition and moves according to the position of the face 
 
-# Arduino Animated Eyes with Servo Control  
-
 This project animates a pair of digital eyes on an OLED display and moves servos based on Serial input. The eyes blink periodically and can be controlled with external commands.
 
 ## Features  
