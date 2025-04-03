@@ -1,0 +1,140 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <Servo.h>
+
+// OLED Display Configuration
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+#define SCREEN_ADDRESS 0x3C
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+// Eye parameters
+const int EYE_WIDTH = 40;
+const int EYE_HEIGHT = 25;
+const int EYE_SPACING = 20;
+
+// Current eye state
+int left_eye_x, left_eye_y;
+int right_eye_x, right_eye_y;
+int current_eye_height = EYE_HEIGHT;
+
+// Servo Configuration
+Servo servo_x;
+Servo servo_y;
+int servo_x_angle = 90;  // Default center position
+int servo_y_angle = 90;
+unsigned long last_blink_time = 0;
+const unsigned long blink_interval = 4000;  // Blink every 4 seconds
+
+void drawEyes() {
+    display.clearDisplay();
+    
+    // Left eye (rectangle)
+    display.fillRect(left_eye_x - EYE_WIDTH/2, 
+                    left_eye_y - current_eye_height/2, 
+                    EYE_WIDTH, 
+                    current_eye_height, 
+                    SSD1306_WHITE);
+    
+    // Right eye (rectangle)
+    display.fillRect(right_eye_x - EYE_WIDTH/2, 
+                    right_eye_y - current_eye_height/2, 
+                    EYE_WIDTH, 
+                    current_eye_height, 
+                    SSD1306_WHITE);
+    
+    display.display();
+}
+
+void centerEyes() {
+    // Calculate center positions
+    left_eye_x = SCREEN_WIDTH/2 - EYE_SPACING/2 - EYE_WIDTH/2;
+    right_eye_x = SCREEN_WIDTH/2 + EYE_SPACING/2 + EYE_WIDTH/2;
+    left_eye_y = right_eye_y = SCREEN_HEIGHT/2;
+    
+    current_eye_height = EYE_HEIGHT;
+    drawEyes();
+}
+
+void wakeUp() {
+    // Start with eyes closed
+    current_eye_height = 2;
+    drawEyes();
+    delay(300);
+    
+    // Animate eyes opening
+    for(int h = 2; h <= EYE_HEIGHT; h += 2) {
+        current_eye_height = h;
+        drawEyes();
+        delay(20);
+    }
+}
+
+void blinkEyes(int blinkSpeed = 10) {
+    // Close eyes
+    for(int h = EYE_HEIGHT; h >= 2; h -= blinkSpeed) {
+        current_eye_height = h;
+        drawEyes();
+        delay(10);
+    }
+    
+    // Open eyes
+    for(int h = 2; h <= EYE_HEIGHT; h += blinkSpeed) {
+        current_eye_height = h;
+        drawEyes();
+        delay(10);
+    }
+}
+
+void setup() {
+    // Initialize display
+    display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
+    display.clearDisplay();
+    display.display();
+    
+    // Initialize servos
+    servo_x.attach(9);   // Connect servo X to pin 9
+    servo_y.attach(10);  // Connect servo Y to pin 10
+    servo_x.write(servo_x_angle);
+    servo_y.write(servo_y_angle);
+    
+    // Initialize serial
+    Serial.begin(9600);
+    
+    // Center eyes and wake up once
+    centerEyes();
+    wakeUp();
+}
+
+void loop() {
+    // Handle blinking
+    if (millis() - last_blink_time >= blink_interval) {
+        blinkEyes();
+        last_blink_time = millis();
+    }
+    
+    // Handle servo commands
+    if (Serial.available() > 0) {
+        String data = Serial.readStringUntil('\n');
+        int commaIndex = data.indexOf(',');
+        
+        if (commaIndex != -1) {
+            // Extract X and Y angles
+            servo_x_angle = data.substring(0, commaIndex).toInt();
+            servo_y_angle = data.substring(commaIndex + 1).toInt();
+            
+            // Constrain angles to valid range
+            servo_x_angle = constrain(servo_x_angle, 0, 180);
+            servo_y_angle = constrain(servo_y_angle, 0, 180);
+            
+            // Move servos
+            servo_x.write(servo_x_angle);
+            servo_y.write(servo_y_angle);
+        }
+    }
+    
+    // Small delay to prevent CPU overload
+    delay(10);
+}
